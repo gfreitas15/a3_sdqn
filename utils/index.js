@@ -61,18 +61,24 @@ function openTokenJWT(jwt) {
 */
 
 //Middleware para testar presença do Token JWT
-const TokenMiddleware = (req, res, next) => {
+const TokenMiddleware = async (req, res, next) => {
   const authorization = req.get("Authorization");
-  const token = authorization ? authorization.split(" ")[1] : "";
-  openTokenJWT(token)
-    .then((payload) => {
-      next(payload, req, res);
-    })
-    .catch((error) => {
-      logger.error("Erro no jwtVerify " + req.baseUrl, error);
+  const token = authorization?.startsWith("Bearer ")
+    ? authorization.split(" ")[1]
+    : null;
 
-      res.status(498).send(error);
-    });
+  if (!token) {
+    return res.status(401).json({ erro: "Token não enviado" });
+  }
+
+  try {
+    const payload = await openTokenJWT(token);
+    req.usuario = payload;
+    next();
+  } catch (error) {
+    console.error("Erro no jwtVerify", error);
+    return res.status(401).json({ erro: error });
+  }
 };
 
 const TokenIsAdminMiddleware = (token, req, res, next) => {
@@ -106,7 +112,7 @@ const createToken = async (data) => {
       .setExpirationTime(validadeToken + "s")
       .sign(secret);
   } catch (error) {
-    logger.error("Erro ao criar o token JWT", error);
+    console.error("Erro ao criar o token JWT", error);
   }
   return { jwt: jwt, jti: data.jti };
 };
