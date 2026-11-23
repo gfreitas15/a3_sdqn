@@ -1,6 +1,7 @@
 import express from 'express';
 import { apiKeyMiddleware } from '../tools/index.js';
 import { criarUsuarioFirebase } from '../tools/index.js';
+import { TokenMiddleware } from '../utils/index.js';
 
 const version = '1.0.0';
 const usersRouter = express.Router();
@@ -13,8 +14,9 @@ function versionMiddleware(req, res, next) {
 
 
 /* GET users listing. */
-usersRouter.get('/', 
+usersRouter.get('/',
   versionMiddleware,
+  TokenMiddleware,
   function(req, res, next) {
   res.send('respond with a resource');
 });
@@ -39,11 +41,12 @@ usersRouter.post('/',
 });
 
 
-usersRouter.get('/you', 
+usersRouter.get('/you',
   apiKeyMiddleware,
+  TokenMiddleware,
   function(req, res, next){
-    
-  res.send('eu sou o Backend! ');
+
+  res.json({ mensagem: 'eu sou o Backend! ', usuario: req.usuario });
 });
 
 

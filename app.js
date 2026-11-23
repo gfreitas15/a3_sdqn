@@ -9,6 +9,7 @@ import cors from "cors";
 
 import indexRouter from "./routes/index.js";
 import { usersRouter } from "./routes/users.js";
+import jwtRouter from "./routes/jwt.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -41,6 +42,11 @@ app.options(
 
 app.use("/", indexRouter);
 app.use("/users", usersRouter);
+app.use("/login", jwtRouter); // POST /login e GET /login/refreshToken
+
+// Rotas de CRUD devem ser protegidas pelo TokenMiddleware, por exemplo:
+// app.use("/alunos", TokenMiddleware, alunosRouter);
+// Dentro delas, o usuário logado fica disponível em req.usuario (uid, email).
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
