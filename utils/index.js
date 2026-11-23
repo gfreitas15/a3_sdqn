@@ -10,10 +10,13 @@ const corsOptions = {
   credentials: true,
 };
 
-const validadeToken = 900; // 5 minutos
+const validadeToken = 900; // 15 minutos (em segundos)
 
 const api_key = process.env.api_key;
 const tokenSecret = process.env.tokenSecret;
+if (!tokenSecret) {
+  throw new Error("Variável de ambiente tokenSecret não definida no .env");
+}
 const secret = createSecretKey(tokenSecret, "utf-8");
 
 //Middleware para testar API Key
@@ -60,38 +63,61 @@ function openTokenJWT(jwt) {
 };
 */
 
-//Middleware para testar presença do Token JWT
-const TokenMiddleware = async (req, res, next) => {
+//Extrai o token do header "Authorization: Bearer <token>" ou do cookie BackendToken
+const extrairToken = (req) => {
   const authorization = req.get("Authorization");
-  const token = authorization?.startsWith("Bearer ")
-    ? authorization.split(" ")[1]
-    : null;
+  if (authorization?.startsWith("Bearer ")) {
+    return authorization.split(" ")[1];
+  }
+  return req.cookies?.BackendToken ?? null;
+};
+
+//Middleware para testar presença e validade do Token JWT
+// - sem token      -> 401
+// - token expirado -> 401 (o cliente deve fazer refresh ou login novamente)
+// - token inválido -> 403
+// - token válido   -> req.usuario = payload; next();
+const TokenMiddleware = async (req, res, next) => {
+  const token = extrairToken(req);
 
   if (!token) {
     return res.status(401).json({ erro: "Token não enviado" });
   }
 
   try {
-    const payload = await openTokenJWT(token);
+    const { payload } = await jwtVerify(token, secret, {
+      algorithms: ["HS256"],
+    });
     req.usuario = payload;
     next();
   } catch (error) {
-    console.error("Erro no jwtVerify", error);
-    return res.status(401).json({ erro: error });
+    if (error.code === "ERR_JWT_EXPIRED") {
+      return res
+        .status(401)
+        .json({ erro: "Token de acesso expirado", codigo: error.code });
+    }
+    return res
+      .status(403)
+      .json({ erro: "Token de acesso inválido", codigo: error.code });
   }
 };
 
-const TokenIsAdminMiddleware = (token, req, res, next) => {
-  if (token.isAdmin && token.nivelAdmin > 0) {
-    next(token, req, res);
+//Middleware para verificar se o usuário do token é admin
+//(usar DEPOIS do TokenMiddleware, pois depende de req.usuario)
+const TokenIsAdminMiddleware = (req, res, next) => {
+  const usuario = req.usuario;
+  if (usuario?.isAdmin && usuario.nivelAdmin > 0) {
+    next();
   } else {
-    res.status(403).send("Usuário não é Admin");
+    res.status(403).json({ erro: "Usuário não é Admin" });
   }
 };
 
 //Cria um token JWT
-const createToken = async (data) => {
-  const secret = createSecretKey(tokenSecret, "utf-8");
+const createToken = async (dados) => {
+  // copia os dados para não alterar o objeto original e descarta as claims
+  // de um token antigo (no refresh, iat/exp/jti precisam ser gerados de novo)
+  const { iat, exp, nbf, jti, ...data } = { ...dados };
   let jwt = undefined;
   if (!data.jti) {
     data.jti = uuidv4();
