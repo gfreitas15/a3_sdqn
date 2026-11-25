@@ -10,6 +10,11 @@ import cors from "cors";
 import indexRouter from "./routes/index.js";
 import { usersRouter } from "./routes/users.js";
 import jwtRouter from "./routes/jwt.js";
+import aulasRouter from "./routes/aulas.js";
+import alunosRouter from "./routes/alunos.js";
+import professoresRouter from "./routes/professores.js";
+import inscricoesRouter from "./routes/inscricoes.js";
+import { TokenMiddleware } from "./utils/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -43,6 +48,10 @@ app.options(
 app.use("/", indexRouter);
 app.use("/users", usersRouter);
 app.use("/login", jwtRouter); // POST /login e GET /login/refreshToken
+app.use("/aulas", TokenMiddleware, aulasRouter);
+app.use("/alunos", TokenMiddleware, alunosRouter);
+app.use("/professores", TokenMiddleware, professoresRouter);
+app.use("/inscricoes", TokenMiddleware, inscricoesRouter);
 
 // Rotas de CRUD devem ser protegidas pelo TokenMiddleware, por exemplo:
 // app.use("/alunos", TokenMiddleware, alunosRouter);
